@@ -1,0 +1,25 @@
+[package]
+name = "blip_hackday"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0.86"
+clap = { version = "4.5.14", features = ["derive"] }
+image = "0.25.2"
+
+candle-core = { git = "https://github.com/huggingface/candle.git", version = "0.6.0" }
+candle-nn = { git = "https://github.com/huggingface/candle.git", version = "0.6.0" }
+candle-transformers = { git = "https://github.com/huggingface/candle.git", version = "0.6.0" }
+hf-hub = "0.3.2"
+tokenizers = "0.20.0"
+axum = { version = "0.7.5", features = ["multipart", "ws"] }
+serde = { version = "1.0.205", features = ["derive"] }
+tokio = {  version = "1.39.2", features = ["rt-multi-thread"] }
+tracing = "0.1.40"
+tracing-subscriber = "0.3.18"
+tower-http = { version = "0.5.2", features = ["limit", "trace"] }
+futures = "0.3.30"
+tokio-util = { version = "0.7.11", features = ["io"] }
+headers = "0.4.0"
+axum-extra = { version = "0.9.3", features = ["typed-header"] }
