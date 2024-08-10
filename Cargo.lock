@@ -3,6 +3,12 @@
 version = 3
 
 [[package]]
+name = "accelerate-src"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "415ed64958754dbe991900f3940677e6a7eefb4d7367afd70d642677b0c7d19d"
+
+[[package]]
 name = "addr2line"
 version = "0.22.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -395,9 +401,11 @@ name = "candle-core"
 version = "0.6.0"
 source = "git+https://github.com/huggingface/candle.git#b7d9af00cc8f2c46edcbe4febbdd3fd781de2c92"
 dependencies = [
+ "accelerate-src",
  "byteorder",
  "gemm",
  "half",
+ "libc",
  "memmap2",
  "num-traits",
  "num_cpus",

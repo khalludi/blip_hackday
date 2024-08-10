@@ -89,7 +89,7 @@ async fn create_caption(mut multipart: Multipart) -> Result<Response<String>, St
             data.len()
         );
 
-        let result = run_blip(data).unwrap();
+        let result = run_blip(data, false).unwrap();
         return Ok(Response::builder()
             .status(StatusCode::CREATED)
             // .body(String::from("Hello world"))
@@ -99,7 +99,6 @@ async fn create_caption(mut multipart: Multipart) -> Result<Response<String>, St
 
     Err(StatusCode::INTERNAL_SERVER_ERROR)
 }
-
 
 async fn ws_handler(
     ws: WebSocketUpgrade,

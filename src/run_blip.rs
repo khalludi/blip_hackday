@@ -1,7 +1,7 @@
 use axum::body::Bytes;
 use candle_core::{Device, DType, Tensor};
 use candle_nn::VarBuilder;
-use candle_transformers::models::blip;
+use candle_transformers::models::{blip, quantized_blip};
 use tokenizers::Tokenizer;
 use crate::load_image::load_image;
 use crate::token_output_stream::TokenOutputStream;
@@ -9,27 +9,34 @@ use anyhow::Error as E;
 
 enum Model {
     M(blip::BlipForConditionalGeneration),
+    Q(quantized_blip::BlipForConditionalGeneration),
 }
 
 impl Model {
     fn text_decoder_forward(&mut self, xs: &Tensor, img_xs: &Tensor) -> candle_core::Result<Tensor> {
         match self {
             Self::M(m) => m.text_decoder().forward(xs, img_xs),
+            Self::Q(m) => m.text_decoder().forward(xs, img_xs),
         }
     }
 }
 
 const SEP_TOKEN_ID: u32 = 102;
 
-pub fn run_blip(image: Bytes) -> anyhow::Result<String> {
+pub fn run_blip(image: Bytes, quantized: bool) -> anyhow::Result<String> {
     let model_file = {
         let api = hf_hub::api::sync::Api::new()?;
-        let api = api.repo(hf_hub::Repo::with_revision(
-            "Salesforce/blip-image-captioning-large".to_string(),
-            hf_hub::RepoType::Model,
-            "refs/pr/18".to_string(),
-        ));
-        api.get("model.safetensors")?
+        if quantized {
+            let api = api.model("lmz/candle-blip".to_string());
+            api.get("blip-image-captioning-large-q4k.gguf")?
+        } else {
+            let api = api.repo(hf_hub::Repo::with_revision(
+                "Salesforce/blip-image-captioning-large".to_string(),
+                hf_hub::RepoType::Model,
+                "refs/pr/18".to_string(),
+            ));
+            api.get("model.safetensors")?
+        }
     };
     let tokenizer = {
         let api = hf_hub::api::sync::Api::new()?;
@@ -44,7 +51,16 @@ pub fn run_blip(image: Bytes) -> anyhow::Result<String> {
     let config = blip::Config::image_captioning_large();
 
     let device = Device::Cpu;
-    let (image_embeds, device, mut model) = {
+    let (image_embeds, device, mut model) = if quantized {
+        let device = Device::Cpu;
+        let image = load_image(image)?.to_device(&device)?;
+        println!("loaded image {image:?}");
+
+        let vb = quantized_blip::VarBuilder::from_gguf(model_file, &device)?;
+        let model = quantized_blip::BlipForConditionalGeneration::new(&config, vb)?;
+        let image_embeds = image.unsqueeze(0)?.apply(model.vision_model())?;
+        (image_embeds, device, Model::Q(model))
+    } else {
         let image = load_image(image)?.to_device(&device)?;
         println!("loaded image {image:?}");
 
