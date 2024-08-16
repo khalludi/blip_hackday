@@ -18,7 +18,7 @@ serde = { version = "1.0.205", features = ["derive"] }
 tokio = {  version = "1.39.2", features = ["rt-multi-thread"] }
 tracing = "0.1.40"
 tracing-subscriber = "0.3.18"
-tower-http = { version = "0.5.2", features = ["limit", "trace"] }
+tower-http = { version = "0.5.2", features = ["limit", "trace", "cors"] }
 futures = "0.3.30"
 tokio-util = { version = "0.7.11", features = ["io"] }
 headers = "0.4.0"

@@ -11,13 +11,14 @@ use clap::Parser;
 use crate::run_blip::run_blip;
 use tower_http::limit::RequestBodyLimitLayer;
 use tower_http::trace::{DefaultMakeSpan, TraceLayer};
-use axum::{routing::{get, post}, http::StatusCode, Router, BoxError, ServiceExt};
+use tower_http::cors::CorsLayer;
+
+use axum::{routing::{get, post}, http::StatusCode, Router, ServiceExt};
 use axum::extract::{ConnectInfo, DefaultBodyLimit, Multipart};
-use axum::extract::ws::{CloseFrame, Message, WebSocket, WebSocketUpgrade};
+use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum_extra::TypedHeader;
 use axum::response::{Html, IntoResponse, Response};
 use futures::{SinkExt, Stream, StreamExt, TryStreamExt};
-use futures::io::Cursor;
 use futures::stream::SplitSink;
 use serde::{Deserialize, Serialize};
 use crate::run_blip_ws::run_blip_ws;
@@ -26,7 +27,7 @@ use crate::run_blip_ws::run_blip_ws;
 pub async fn main(){
     // initialize tracing
     tracing_subscriber::fmt()
-        // .with_max_level(tracing::Level::DEBUG)
+        .with_max_level(tracing::Level::DEBUG)
         .init();
 
     // build our application with a route
@@ -44,7 +45,8 @@ pub async fn main(){
         .layer(DefaultBodyLimit::disable())
         .layer(RequestBodyLimitLayer::new(
             250 * 1024 * 1024, /* 250mb */
-        ));
+        ))
+        .layer(CorsLayer::permissive());
 
     // run our app with hyper, listening globally on port 3000
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3030").await.unwrap();
@@ -78,7 +80,6 @@ async fn show_form() -> Html<&'static str> {
 
 async fn create_caption(mut multipart: Multipart) -> Result<Response<String>, StatusCode> {
     while let Some(field) = multipart.next_field().await.unwrap() {
-        // let id = field.id().unwrap().to_string();
         let name = field.name().unwrap().to_string();
         let file_name = field.file_name().unwrap().to_string();
         let content_type = field.content_type().unwrap().to_string();
@@ -116,7 +117,7 @@ async fn ws_handler(
     ws.on_upgrade(move |socket| handle_socket(socket, addr))
 }
 
-/// Actual websocket statemachine (one will be spawned per connection)
+/// Actual websocket state machine (one will be spawned per connection)
 async fn handle_socket(mut socket: WebSocket, who: SocketAddr) {
     // send a ping (unsupported by some browsers) just to kick things off and get a response
     if socket.send(Message::Ping(vec![1, 2, 3])).await.is_ok() {
@@ -148,14 +149,14 @@ async fn handle_socket(mut socket: WebSocket, who: SocketAddr) {
     // Waiting for this client to finish getting its greetings does not prevent other clients from
     // connecting to server and receiving their greetings.
     for i in 1..5 {
-        if socket
-            .send(Message::Text(format!("Hi {i} times!")))
-            .await
-            .is_err()
-        {
-            println!("client {who} abruptly disconnected");
-            return;
-        }
+        // if socket
+        //     .send(Message::Text(format!("Hi {i} times!")))
+        //     .await
+        //     .is_err()
+        // {
+        //     println!("client {who} abruptly disconnected");
+        //     return;
+        // }
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
     }
 
@@ -235,8 +236,9 @@ async fn process_message(msg: Message, who: SocketAddr, sender: &mut SplitSink<W
             sender.send(Message::Text(String::from("Hello World"))).await.unwrap()
         }
         Message::Binary(d) => {
-            println!(">>> {} sent {} bytes: {:?}", who, d.len(), d);
-            let result = run_blip_ws(d);
+            println!(">>> {} sent {} bytes", who, d.len());
+
+            run_blip_ws(d, false, sender).await.unwrap();
         }
         Message::Close(c) => {
             if let Some(cf) = c {
